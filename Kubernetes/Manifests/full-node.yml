@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: avail-node
+  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: avail-node
+      
+  template:
+    metadata:
+      labels:
+        app: avail-node
+        
+    spec:
+      containers:
+      - name: avail
+        image: availj/avail:v1.8.0.0
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            sed -i '/--execution native-else-wasm/a \        --prometheus-external \\' /entrypoint.sh
+            /entrypoint.sh
+        ports:
+        - containerPort: 30333
+        - containerPort: 9615
+        - containerPort: 9944
+        env:
+        - name: DA_CHAIN
+          value: "goldberg"
+        - name: DA_NAME
+          value: "noodler-full-1"
+        volumeMounts:
+        - name: state
+          mountPath: /da/state
+        - name: keystore
+          mountPath: /da/keystore
+        - name: config
+          mountPath: /da/config
+      volumes:
+      - name: state
+        persistentVolumeClaim:
+          claimName: state-pvc
+      - name: keystore
+        persistentVolumeClaim:
+          claimName: keystore-pvc
+      - name: config
+        persistentVolumeClaim:
+          claimName: config-pvc
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: state-pvc
+  
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: keystore-pvc
+  
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 100Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: config-pvc
+  
+spec:
+  accessModes:
+  - ReadWriteOnce
+  storageClassName: longhorn
+  resources:
+    requests:
+      storage: 50Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: avail-node-metrics
+spec:
+  type: ClusterIP
+  selector:
+    app: avail-node
+  ports:
+    - protocol: TCP
+      port: 9615
+      targetPort: 9615
